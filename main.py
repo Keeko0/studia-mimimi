@@ -1,85 +1,81 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
-import csv
+# main.py
+from fastapi import FastAPI, Depends
+from sqlalchemy.orm import Session
 from typing import List, Optional
+from pydantic import BaseModel
+
+# Importujemy rzeczy z naszego pliku database.py
+from database import SessionLocal, MovieModel, LinkModel, RatingModel, TagModel
 
 app = FastAPI()
 
-class Movie(BaseModel):
+# --- Dependency ---
+# Ta funkcja tworzy sesję bazy danych dla każdego requestu i zamyka ją po zakończeniu
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# --- Modele Pydantic (Schematy odpowiedzi API) ---
+# To zostaje bez zmian - definiuje jak wygląda JSON
+class MovieSchema(BaseModel):
     movieId: str 
     title: str
     genres: str
+    class Config:
+        from_attributes = True # Ważne dla ORM! (dawniej orm_mode = True)
 
-class Link(BaseModel):
+class LinkSchema(BaseModel):
     movieId: str
     imdbId: str
-    tmdbId: Optional[str] = None 
+    tmdbId: Optional[str] = None
+    class Config:
+        from_attributes = True
 
-class Rating(BaseModel):
+class RatingSchema(BaseModel):
     userId: str
     movieId: str
     rating: float
     timestamp: str
+    class Config:
+        from_attributes = True
 
-class Tag(BaseModel):
+class TagSchema(BaseModel):
     userId: str
     movieId: str
     tag: str
     timestamp: str
+    class Config:
+        from_attributes = True
 
-def load_data_from_file(filepath: str, model_class: type[BaseModel]) -> List[BaseModel]:
-    data = []
-    try:
-        with open(filepath, mode='r', encoding='utf-8') as file:
-            csv_reader = csv.DictReader(file)
-            
-            for row in csv_reader:
-                try:
-                    data_object = model_class(**row)
-                    data.append(data_object)
-                except Exception as e:
-                    print(f"Błąd przetwarzania wiersza: {row}. Błąd: {e}")
-                    
-    except FileNotFoundError:
-        print(f"BŁĄD KRYTYCZNY: Nie znaleziono pliku {filepath}.")
-    except Exception as e:
-        print(f"Wystąpił nieoczekiwany błąd przy wczytywaniu {filepath}: {e}")
-        
-    return data 
-
-print("Wczytywanie danych z plików CSV...")
-
-all_movies = load_data_from_file('movies.csv', Movie)
-all_links = load_data_from_file('links.csv', Link)
-all_ratings = load_data_from_file('ratings.csv', Rating)
-all_tags = load_data_from_file('tags.csv', Tag)
-
-print("Wczytywanie danych zakończone.")
-print(f"Załadowano: {len(all_movies)} filmów, {len(all_links)} linków, {len(all_ratings)} ocen, {len(all_tags)} tagów.")
+# --- Endpointy ---
 
 @app.get("/")
 def read_root():
     return {"hello": "world"}
 
-@app.get("/movies", response_model=List[Movie])
-def get_movies():
-    return all_movies
+# Wstrzykujemy sesję bazy danych (db: Session = Depends(get_db))
 
-@app.get("/links", response_model=List[Link])
-def get_links():
-    return all_links
+@app.get("/movies", response_model=List[MovieSchema])
+def get_movies(db: Session = Depends(get_db)):
+    # Pobieramy dane SQL: SELECT * FROM movies
+    return db.query(MovieModel).all()
 
-@app.get("/ratings", response_model=List[Rating])
-def get_ratings():
-    return all_ratings
+@app.get("/links", response_model=List[LinkSchema])
+def get_links(db: Session = Depends(get_db)):
+    return db.query(LinkModel).all()
 
-@app.get("/tags", response_model=List[Tag])
-def get_tags():
-    return all_tags
+@app.get("/ratings", response_model=List[RatingSchema])
+def get_ratings(db: Session = Depends(get_db)):
+    # Limitujemy do 100, bo ratingów może być bardzo dużo i zamuli przeglądarkę
+    return db.query(RatingModel).limit(100).all()
+
+@app.get("/tags", response_model=List[TagSchema])
+def get_tags(db: Session = Depends(get_db)):
+    return db.query(TagModel).all()
 
 if __name__ == "__main__":
     import uvicorn
-    print("Serwer http://127.0.0.1:8000")
     uvicorn.run(app, host="127.0.0.1", port=8000)
-    
-#uvicorn main:app --reload
