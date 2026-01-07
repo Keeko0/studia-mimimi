@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+  # 1. Nasz RabbitMQ (bez zmian, tylko dodajemy sieci healthcheck)
+  rabbitmq:
+    image: rabbitmq:3-management
+    hostname: my-rabbit
+    container_name: some-rabbit
+    ports:
+      - "8080:15672"
+      - "5672:5672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 2. Serwis A (Magazyn wyników)
+  service-a:
+    build: ./service_a       # Buduj z folderu service_a
+    ports:
+      - "8000:8000"          # Wystawiamy port na świat
+    depends_on:
+      - rabbitmq
+    volumes:
+      - ./service_a:/app     # Hot-reload: zmiany w kodzie będą widoczne od razu
+
+  # 3. Serwis B - API (Zlecający)
+  service-b-api:
+    build: ./service_b       # Buduj z folderu service_b
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8001:8000"          # Mapujemy port 8000 kontenera na 8001 Twojego komputera
+    environment:
+      - RABBIT_HOST=rabbitmq # Podajemy nazwę serwisu rabbita
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  # 4. Serwis B - Worker (Robotnik)
+  service-b-worker:
+    build: ./service_b       # Ten sam folder co API
+    command: python worker.py # Inna komenda startowa
+    deploy:
+      replicas: 2            # SKALOWANIE! (Punkt 5 wytycznych) [cite: 9]
+    environment:
+      - RABBIT_HOST=rabbitmq
+      - SERVICE_A_URL=http://service-a:8000/results # Nazwa serwisu z linii 18
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      service-a:
+        condition: service_started
