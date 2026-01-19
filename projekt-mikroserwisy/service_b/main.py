@@ -29,4 +29,4 @@ def send_to_rabbit(message: str):
 def count_people(request: ImageRequest):
     send_to_rabbit(request.url)
     
-    return {"message": "Zadanie przyjęte do realizacji", "url": request.url}
+    return {"message": "zadanie przyjęte", "url": request.url}

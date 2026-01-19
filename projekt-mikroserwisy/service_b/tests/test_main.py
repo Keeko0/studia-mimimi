@@ -9,31 +9,29 @@ from main import app
 
 client = TestClient(app)
 
-# Testujemy endpoint POST /count-people
-# Używamy @patch, żeby podmienić 'pika.BlockingConnection' na naszą atrapę
+#endpoint POST /count-people
 @patch("main.pika.BlockingConnection")
 def test_send_to_rabbit(mock_connection):
-    # 1. Przygotowanie atrapy
-    # Kiedy kod poprosi o kanał (connection.channel()), dajemy mu fałszywy obiekt
+    #przygotowanie atrapy + false object
     mock_channel = MagicMock()
     mock_connection.return_value.channel.return_value = mock_channel
 
-    # 2. Wykonanie zapytania do API
-    payload = {"url": "http://test-image.com/img.jpg"}
+    #zapytanie API
+    payload = {"url": "https://media.istockphoto.com/id/1977329451/photo/diverse-businesspeople-smiling-while-standing-arm-in-arm-in-an-office.jpg?s=612x612&w=0&k=20&c=FvQFfKBc7iAUPz48tdU_hzvTPCdGSntmdlceDeUuKRs="}
     response = client.post("/count-people", json=payload)
 
-    # 3. Sprawdzenia (Asercje)
+    #check
     assert response.status_code == 200
     assert response.json() == {
-        "message": "Zadanie przyjęte do realizacji",
-        "url": "http://test-image.com/img.jpg"
+        "message": "Zadanie przyjęte",
+        "url": "https://media.istockphoto.com/id/1977329451/photo/diverse-businesspeople-smiling-while-standing-arm-in-arm-in-an-office.jpg?s=612x612&w=0&k=20&c=FvQFfKBc7iAUPz48tdU_hzvTPCdGSntmdlceDeUuKRs="
     }
 
-    # 4. Sprawdzamy, czy API faktycznie próbowało wysłać coś do Rabbita
-    # Czy funkcja basic_publish została wywołana?
+    #api rabbit check
+    #basic_publish check
     mock_channel.basic_publish.assert_called_once()
     
-    # Możemy nawet sprawdzić, czy wysłano dobry URL w body
+    #body url
     args, kwargs = mock_channel.basic_publish.call_args
-    assert kwargs['body'] == "http://test-image.com/img.jpg"
+    assert kwargs['body'] == "https://media.istockphoto.com/id/1977329451/photo/diverse-businesspeople-smiling-while-standing-arm-in-arm-in-an-office.jpg?s=612x612&w=0&k=20&c=FvQFfKBc7iAUPz48tdU_hzvTPCdGSntmdlceDeUuKRs="
     assert kwargs['routing_key'] == 'ai_queue'

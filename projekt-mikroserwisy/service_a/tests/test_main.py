@@ -12,7 +12,7 @@ from sqlalchemy.pool import StaticPool
 from main import app, get_db
 from database import Base
 
-# 1. Tworzymy testową bazę danych w pamięci RAM (znika po testach)
+#testowa baza danych w ramie
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 
 engine = create_engine(
@@ -22,7 +22,7 @@ engine = create_engine(
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# 2. Funkcja, która podmienia oryginalne połączenie do bazy
+#override db na fake'a
 def override_get_db():
     try:
         db = TestingSessionLocal()
@@ -30,48 +30,47 @@ def override_get_db():
     finally:
         db.close()
 
-# 3. Podmieniamy zależność w naszej aplikacji
+#zaleznosc
 app.dependency_overrides[get_db] = override_get_db
 
-# 4. Tworzymy klienta testowego
+#test client
 client = TestClient(app)
 
-# 5. Przygotowanie bazy przed testami (tworzenie tabel)
+#robienie tabel
 @pytest.fixture(autouse=True)
 def setup_database():
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
 
-# --- WŁAŚCIWE TESTY ---
-
+#TESTY
 def test_create_result():
-    """Testuje, czy endpoint POST /results poprawnie zapisuje dane."""
+    #enpoint POST /results - zapisywanie danych
     payload = {
-        "image_url": "http://test.com/photo.jpg",
+        "image_url":"https://media.istockphoto.com/id/1977329451/photo/diverse-businesspeople-smiling-while-standing-arm-in-arm-in-an-office.jpg?s=612x612&w=0&k=20&c=FvQFfKBc7iAUPz48tdU_hzvTPCdGSntmdlceDeUuKRs=",
         "person_count": 10
     }
     
     response = client.post("/results", json=payload)
     
-    # Asercje (sprawdzenia)
+    #check
     assert response.status_code == 200
     data = response.json()
-    assert data["image_url"] == "http://test.com/photo.jpg"
+    assert data["image_url"] == "https://media.istockphoto.com/id/1977329451/photo/diverse-businesspeople-smiling-while-standing-arm-in-arm-in-an-office.jpg?s=612x612&w=0&k=20&c=FvQFfKBc7iAUPz48tdU_hzvTPCdGSntmdlceDeUuKRs="
     assert data["person_count"] == 10
-    assert "id" in data  # Sprawdzamy, czy baza nadała ID
+    assert "id" in data
 
 def test_read_results():
-    """Testuje, czy endpoint GET /results zwraca to, co dodaliśmy."""
-    # Najpierw dodajemy 2 wyniki
+    #endpoint GET /results - zwracanie danych
+    #dodajemy 2 wyniki
     client.post("/results", json={"image_url": "http://a.com", "person_count": 1})
     client.post("/results", json={"image_url": "http://b.com", "person_count": 2})
 
-    # Teraz pobieramy listę
     response = client.get("/results")
     
+    #sprawdzamy czy sa te 2 wyniki
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 2  # Powinny być 2 elementy
+    assert len(data) == 2
     assert data[0]["person_count"] == 1
     assert data[1]["person_count"] == 2
