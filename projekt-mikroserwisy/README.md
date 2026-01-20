@@ -1,3 +1,13 @@
+technologie:
+python 3.9 (backend)
+fastAPI (framework API REST)
+rabbitMQ + Pika (queue)
+docker & Docker Compose (infrastruktura)
+SQLAlchemy + SQLite (baza danych)
+YOLOv8 (ai robiące wykrywanie zdjęć)
+HTML/JS (frontend dla użytkownika)
+
+
 wymagania: odpalony docker
 
 rabbitmq:
