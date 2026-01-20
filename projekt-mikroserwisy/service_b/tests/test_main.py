@@ -23,7 +23,7 @@ def test_send_to_rabbit(mock_connection):
     #check
     assert response.status_code == 200
     assert response.json() == {
-        "message": "Zadanie przyjęte",
+        "message": "zadanie przyjęte",
         "url": "https://media.istockphoto.com/id/1977329451/photo/diverse-businesspeople-smiling-while-standing-arm-in-arm-in-an-office.jpg?s=612x612&w=0&k=20&c=FvQFfKBc7iAUPz48tdU_hzvTPCdGSntmdlceDeUuKRs="
     }
 
